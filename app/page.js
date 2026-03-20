@@ -11,8 +11,29 @@ function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+// Helpers to persist chat session across reloads
+function saveSession(username, room) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem("chat_username", username);
+  sessionStorage.setItem("chat_room", room);
+}
+
+function loadSession() {
+  if (typeof window === "undefined") return null;
+  const username = sessionStorage.getItem("chat_username");
+  const room = sessionStorage.getItem("chat_room");
+  if (username && room) return { username, room };
+  return null;
+}
+
+function clearSession() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem("chat_username");
+  sessionStorage.removeItem("chat_room");
+}
+
 export default function ChatPage() {
-  const [screen, setScreen] = useState("home"); // home | chat
+  const [screen, setScreen] = useState("loading"); // loading | home | chat
   const [username, setUsername] = useState("");
   const [inputName, setInputName] = useState("");
   const [room, setRoom] = useState("");
@@ -23,6 +44,18 @@ export default function ChatPage() {
 
   const { messages, connected, sendMessage } = useSocket(room);
 
+  // On mount, restore session from sessionStorage
+  useEffect(() => {
+    const session = loadSession();
+    if (session) {
+      setUsername(session.username);
+      setRoom(session.room);
+      setScreen("chat");
+    } else {
+      setScreen("home");
+    }
+  }, []);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -30,16 +63,29 @@ export default function ChatPage() {
   const handleCreateRoom = () => {
     if (!inputName.trim()) return;
     const newRoom = generateRoomId();
-    setUsername(inputName.trim());
+    const name = inputName.trim();
+    setUsername(name);
     setRoom(newRoom);
+    saveSession(name, newRoom);
     setScreen("chat");
   };
 
   const handleJoinRoom = () => {
     if (!inputName.trim() || !roomInput.trim()) return;
-    setUsername(inputName.trim());
-    setRoom(roomInput.trim().toUpperCase());
+    const name = inputName.trim();
+    const targetRoom = roomInput.trim().toUpperCase();
+    setUsername(name);
+    setRoom(targetRoom);
+    saveSession(name, targetRoom);
     setScreen("chat");
+  };
+
+  const handleLeaveRoom = () => {
+    clearSession();
+    setUsername("");
+    setRoom("");
+    setMessageInput("");
+    setScreen("home");
   };
 
   const handleSend = () => {
@@ -53,6 +99,15 @@ export default function ChatPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // LOADING SCREEN (avoids hydration mismatch)
+  if (screen === "loading") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-sm text-slate-400">Loading...</div>
+      </main>
+    );
+  }
 
   // HOME SCREEN
   if (screen === "home") {
@@ -130,16 +185,25 @@ export default function ChatPage() {
               </button>
             </div>
           </div>
-          <Badge
-            variant="outline"
-            className={`text-xs ${
-              connected
-                ? "border-green-400 text-green-600"
-                : "border-red-300 text-red-400"
-            }`}
-          >
-            {connected ? "● Live" : "○ Offline"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                connected
+                  ? "border-green-400 text-green-600"
+                  : "border-red-300 text-red-400"
+              }`}
+            >
+              {connected ? "● Live" : "○ Offline"}
+            </Badge>
+            <button
+              onClick={handleLeaveRoom}
+              className="text-xs text-slate-400 hover:text-red-500 transition-colors ml-2"
+              title="Leave room"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Room share hint */}
