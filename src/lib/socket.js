@@ -4,7 +4,7 @@ let socket;
 
 export const getSocket = () => {
   if (!socket) {
-    socket = io(process.env.NEXT_PUBLIC_APP_URL || "https://chat-app-wheat-three-10.vercel.app", {
+    socket = io(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000", {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
